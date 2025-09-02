@@ -28,12 +28,80 @@ async function transcribe(videoUrl: string) {
   
 }
 
-async function mockMistralHook(transcript: string) {
-  // pretend to call Mistral to generate a hook based on transcript
-  console.log('Generating hook for transcript:', transcript);
-  await sleep(200);
-  const hook = `Hook: ${transcript.slice(0, 40)}... You won't believe the twist!`;
-  return { hook };
+async function generateHooks(transcript: string) {
+  try {
+    const apiKey = process.env.MISTRAL_API_KEY;
+    if (!apiKey) {
+      throw new Error('MISTRAL_API_KEY not configured');
+    }
+
+    const prompt = `You are a YouTube content strategist. Based on the transcript, create 3 unique, catchy hook suggestions (2–6 words each) for the start of the video.  
+
+Rules:  
+- Hooks must be between 2 and 6 words.  
+- Make them bold, curiosity-driven, or emotionally engaging.  
+- Use a natural, conversational YouTube style.  
+- Each hook should use a different style (e.g., shocking fact, bold claim, relatable question).  
+- Do not summarize; make viewers curious to watch.  
+
+Return ONLY valid JSON in this format:  
+{
+  "hooks": [
+    {"hook_1": "First hook"},
+    {"hook_2": "Second hook"},
+    {"hook_3": "Third hook"}
+  ]
+}
+
+Transcript: ${transcript}`;
+
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'mistral-large-latest',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Mistral API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error('No content returned from Mistral API');
+    }
+
+    // Clean up markdown formatting and parse the JSON response
+    const cleanedContent = content.replace(/\*\*/g, '');
+    const hooksData = JSON.parse(cleanedContent);
+    return { hooks: hooksData.hooks };
+
+  } catch (error) {
+    console.error('Error generating hooks:', error);
+    // Fallback to mock if real API fails
+    await sleep(200);
+    return { 
+      hooks: [
+        { hook_1: "You won't believe this!" },
+        { hook_2: "This changes everything!" },
+        { hook_3: "The truth will shock you!" }
+      ]
+    };
+  }
 }
 
 async function mockSaveImage(file?: File | null) {
@@ -68,7 +136,7 @@ export async function POST(req: Request) {
       mockSaveImage(logo),
     ]);
 
-    const { hook } = await mockMistralHook(transcript);
+    const { hooks } = await generateHooks(transcript);
 
     // Persist to DB (mock URLs)
     await connectToDatabase();
@@ -76,7 +144,7 @@ export async function POST(req: Request) {
       logoUrl: logoSaved.url,
       faceUrl: headshotSaved.url,
       transcript,
-      hookProposal: hook,
+      hookProposal: hooks,
       selectedHook: null,
       imageVignette: null,
     });
@@ -86,7 +154,7 @@ export async function POST(req: Request) {
       id: String(doc._id),
       videoUrl,
       transcript,
-      hook,
+      hooks,
       headshot: headshotSaved,
       logo: logoSaved,
     });
