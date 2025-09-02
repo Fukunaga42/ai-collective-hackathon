@@ -1,12 +1,28 @@
 import { NextResponse } from "next/server";
 
 // Mock helpers simulating external services
-async function mockTranscribe(videoUrl: string) {
-  // pretend to call a transcript service
-  await sleep(200);
-  return {
-    transcript: `Mock transcript for ${videoUrl}`,
-  };
+async function transcribe(videoUrl: string) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/transcript?url=${encodeURIComponent(videoUrl)}`);
+    
+    if (!response.ok) {
+      throw new Error(`Transcript API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return {
+      transcript: data.transcript || data.text || JSON.stringify(data),
+    };
+  } catch (error) {
+    console.error('Error fetching transcript:', error);
+    // Fallback to mock if real API fails
+    await sleep(200);
+    return {
+      transcript: `Mock transcript for ${videoUrl} (API unavailable)`,
+    };
+  }
+
+  
 }
 
 async function mockMistralHook(transcript: string) {
@@ -43,7 +59,7 @@ export async function POST(req: Request) {
     }
 
     const [{ transcript }, headshotSaved, logoSaved] = await Promise.all([
-      mockTranscribe(videoUrl),
+      transcribe(videoUrl),
       mockSaveImage(headshot),
       mockSaveImage(logo),
     ]);
