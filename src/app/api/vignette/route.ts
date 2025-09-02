@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Vignette from "@/models/Vignette";
+import console from "console";
 
 // Mock helpers simulating external services
 async function transcribe(videoUrl: string) {
@@ -29,6 +30,7 @@ async function transcribe(videoUrl: string) {
 
 async function mockMistralHook(transcript: string) {
   // pretend to call Mistral to generate a hook based on transcript
+  console.log('Generating hook for transcript:', transcript);
   await sleep(200);
   const hook = `Hook: ${transcript.slice(0, 40)}... You won't believe the twist!`;
   return { hook };
