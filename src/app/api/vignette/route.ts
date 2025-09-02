@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/mongodb";
+import Vignette from "@/models/Vignette";
 
 // Mock helpers simulating external services
 async function mockTranscribe(videoUrl: string) {
@@ -50,8 +52,20 @@ export async function POST(req: Request) {
 
     const { hook } = await mockMistralHook(transcript);
 
+    // Persist to DB (mock URLs)
+    await connectToDatabase();
+    const doc = await Vignette.create({
+      logoUrl: logoSaved.url,
+      faceUrl: headshotSaved.url,
+      transcript,
+      hookProposal: hook,
+      selectedHook: null,
+      imageVignette: null,
+    });
+
     return NextResponse.json({
       ok: true,
+      id: String(doc._id),
       videoUrl,
       transcript,
       hook,
