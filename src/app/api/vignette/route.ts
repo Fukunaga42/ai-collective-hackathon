@@ -35,10 +35,11 @@ async function generateHooks(transcript: string) {
       throw new Error('MISTRAL_API_KEY not configured');
     }
 
-    const prompt = `You are a YouTube content strategist. Based on the transcript, create 3 unique, catchy hook suggestions (2–6 words each) for the start of the video.  
+    const prompt = `You are a YouTube content strategist. Based on the transcript, create 3 unique, catchy hook suggestions (1–5 words each) for the start of the video.  
 
-Rules:  
-- Hooks must be between 2 and 6 words.  
+CRITICAL RULES:  
+- Hooks must be between 1 and 5 words. MAXIMUM 5 WORDS PER HOOK.
+- Count words carefully: "1 jeune sur 4" = 4 words, "est dépressif" = 2 words
 - Make them bold, curiosity-driven, or emotionally engaging.  
 - Use a natural, conversational YouTube style.  
 - Each hook should use a different style (e.g., shocking fact, bold claim, relatable question).  
@@ -88,7 +89,22 @@ Transcript: ${transcript}`;
     // Clean up markdown formatting and parse the JSON response
     const cleanedContent = content.replace(/\*\*/g, '');
     const hooksData = JSON.parse(cleanedContent);
-    return { hooks: hooksData.hooks };
+    
+    // Post-process to ensure hooks are 1-5 words
+    const processedHooks = hooksData.hooks.map((hook: any) => {
+      const key = Object.keys(hook)[0];
+      let value = hook[key];
+      const words = value.split(' ');
+      
+      if (words.length > 5) {
+        // Truncate to 5 words if too long
+        value = words.slice(0, 5).join(' ');
+      }
+      
+      return { [key]: value };
+    });
+    
+    return { hooks: processedHooks };
 
   } catch (error) {
     console.error('Error generating hooks:', error);
